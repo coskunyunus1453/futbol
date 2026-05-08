@@ -188,8 +188,13 @@ export class PenaltyScene {
     this.timer += dt;
     if (this.state === "ready" || this.state === "aiming") {
       if (this._userIsShooter) {
-        // Şutör kontrolü artık sürükle-bırak ile yapılır.
+        // Şutör kontrolü: drag-shot + joystick fallback birlikte.
         this.state = "aiming";
+        if (!this.dragAim.active) {
+          // Drag kullanılmıyorsa joystick ile hedef almayı canlı güncelle.
+          this.aim.x += (input.dir.x - this.aim.x) * Math.min(1, dt * 8);
+          this.aim.y += (input.dir.y - this.aim.y) * Math.min(1, dt * 8);
+        }
         if (input.just.shoot) {
           const power = Math.max(0.4, input.shootCharge || 0.6);
           this._takeShot(this.aim.x, power, this.aim.y);
