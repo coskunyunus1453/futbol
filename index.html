@@ -30,6 +30,39 @@
       <h1 class="logo">⚽ Sevimli Futbol</h1>
       <p class="tag">Tatlı karakterler · Gerçekçi top fiziği · Online & Yapay Zeka</p>
 
+      <div class="unity-header">
+        <div class="player-card" id="player-team-card">
+          <div class="crest" id="player-team-icon">🛡️</div>
+          <div class="meta">
+            <div class="label">Takımım</div>
+            <div class="name" id="player-team-name">Kırmızılar</div>
+          </div>
+        </div>
+        <div class="vs-pill">VS</div>
+        <div class="player-card enemy" id="enemy-team-card">
+          <div class="crest" id="enemy-team-icon">🦅</div>
+          <div class="meta">
+            <div class="label">Rakibim</div>
+            <div class="name" id="enemy-team-name">Maviler</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="team-config">
+        <div class="team-row">
+          <label>1) Takımını Seç</label>
+          <div class="team-picks" id="team-picks"></div>
+        </div>
+        <div class="team-row">
+          <label>2) Rakibini Seç</label>
+          <div class="team-picks enemy-picks" id="enemy-picks"></div>
+        </div>
+      </div>
+
+      <div class="mode-section">
+        <div class="mode-title-row">
+          <span class="section-label">3) Oyun Modu</span>
+        </div>
       <div class="mode-grid">
         <button class="mode-btn" data-mode="match-ai">
           <span class="mode-icon">🤖</span>
@@ -52,10 +85,6 @@
           <span class="mode-sub">Oda kodu — Kaleci & Şutör</span>
         </button>
       </div>
-
-      <div class="team-row">
-        <label>Takımın</label>
-        <div class="team-picks" id="team-picks"></div>
       </div>
 
       <p class="hint">İpucu: Sol joystick ile koş, sağ butonlarla <b>PAS</b>, <b>ORTA</b>, <b>ŞUT</b> yap.</p>

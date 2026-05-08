@@ -30,29 +30,99 @@ const state = {
   rafId: 0,
   lastT: 0,
 };
+const STORAGE_KEYS = {
+  homeTeam: "cutefb_homeTeam",
+  awayTeam: "cutefb_awayTeam",
+};
 
 // ---------- MENU ----------
 function renderTeamPicker() {
-  const wrap = $("#team-picks");
-  wrap.innerHTML = "";
-  TEAMS.forEach(t => {
+  const homeWrap = $("#team-picks");
+  const enemyWrap = $("#enemy-picks");
+  homeWrap.innerHTML = "";
+  enemyWrap.innerHTML = "";
+
+  const makeTeamBtn = (team, selected, disabled, onClick) => {
     const b = document.createElement("button");
-    b.className = "team-pick" + (t.id === state.homeTeam ? " selected" : "");
-    b.style.background = t.primary;
-    b.title = t.name;
-    b.addEventListener("click", () => {
-      Sfx.click();
-      state.homeTeam = t.id;
-      // rakip otomatik olarak farklı bir takım
-      const others = TEAMS.filter(x=>x.id!==t.id);
-      state.awayTeam = others[Math.floor(Math.random()*others.length)].id;
-      renderTeamPicker();
-    });
-    wrap.appendChild(b);
+    b.className = "team-pick" + (selected ? " selected" : "") + (disabled ? " disabled" : "");
+    b.style.background = team.primary;
+    b.style.color = team.secondary;
+    b.title = team.name;
+    b.textContent = team.icon || "🛡️";
+    b.disabled = disabled;
+    b.addEventListener("click", onClick);
+    return b;
+  };
+
+  TEAMS.forEach(t => {
+    homeWrap.appendChild(
+      makeTeamBtn(
+        t,
+        t.id === state.homeTeam,
+        false,
+        () => {
+          Sfx.click();
+          state.homeTeam = t.id;
+          // Rakip aynı takım olamaz; aynıysa ilk farklı takıma sabitle
+          if (state.awayTeam === state.homeTeam) {
+            const fallback = TEAMS.find(x => x.id !== state.homeTeam);
+            state.awayTeam = fallback ? fallback.id : state.awayTeam;
+          }
+          persistTeams();
+          renderTeamPicker();
+        }
+      )
+    );
   });
+
+  TEAMS.forEach(t => {
+    enemyWrap.appendChild(
+      makeTeamBtn(
+        t,
+        t.id === state.awayTeam,
+        t.id === state.homeTeam,
+        () => {
+          Sfx.click();
+          state.awayTeam = t.id;
+          persistTeams();
+          renderTeamPicker();
+        }
+      )
+    );
+  });
+
+  updateMenuTeamHeader();
+}
+
+function updateMenuTeamHeader() {
+  const home = teamById(state.homeTeam);
+  const away = teamById(state.awayTeam);
+  $("#player-team-name").textContent = home.name;
+  $("#player-team-icon").textContent = home.icon || "🛡️";
+  $("#enemy-team-name").textContent = away.name;
+  $("#enemy-team-icon").textContent = away.icon || "🛡️";
+  $("#player-team-card").style.borderColor = home.primary;
+  $("#enemy-team-card").style.borderColor = away.primary;
+}
+
+function persistTeams() {
+  localStorage.setItem(STORAGE_KEYS.homeTeam, state.homeTeam);
+  localStorage.setItem(STORAGE_KEYS.awayTeam, state.awayTeam);
+}
+
+function loadPersistedTeams() {
+  const home = localStorage.getItem(STORAGE_KEYS.homeTeam);
+  const away = localStorage.getItem(STORAGE_KEYS.awayTeam);
+  if (home && TEAMS.some(t => t.id === home)) state.homeTeam = home;
+  if (away && TEAMS.some(t => t.id === away)) state.awayTeam = away;
+  if (state.homeTeam === state.awayTeam) {
+    const fallback = TEAMS.find(t => t.id !== state.homeTeam);
+    if (fallback) state.awayTeam = fallback.id;
+  }
 }
 
 function setupMenu() {
+  loadPersistedTeams();
   renderTeamPicker();
   $$("#menu .mode-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -181,8 +251,8 @@ function startScene(kind, opts) {
   setupPenaltyPointerControls(canvas);
 
   // HUD
-  $("#home-name").textContent = teamById(state.homeTeam).name.slice(0,3).toUpperCase();
-  $("#away-name").textContent = teamById(state.awayTeam).name.slice(0,3).toUpperCase();
+  $("#home-name").textContent = teamById(state.homeTeam).short || teamById(state.homeTeam).name.slice(0,3).toUpperCase();
+  $("#away-name").textContent = teamById(state.awayTeam).short || teamById(state.awayTeam).name.slice(0,3).toUpperCase();
   $("#home-score").textContent = "0";
   $("#away-score").textContent = "0";
   $("#match-clock").textContent = sceneOpts.duration;

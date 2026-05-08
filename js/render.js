@@ -3,12 +3,12 @@
 import { FIELD } from "./physics.js";
 
 export const TEAMS = [
-  { id:"red",   primary:"#ff4d4d", secondary:"#ffe082", name:"Kırmızılar" },
-  { id:"blue",  primary:"#4d8cff", secondary:"#ffffff", name:"Maviler"   },
-  { id:"yellow",primary:"#ffd84d", secondary:"#1a1a1a", name:"Sarılar"   },
-  { id:"green", primary:"#36c264", secondary:"#0c2c14", name:"Yeşiller"  },
-  { id:"purple",primary:"#a974ff", secondary:"#ffffff", name:"Morlar"    },
-  { id:"orange",primary:"#ff8a3d", secondary:"#222222", name:"Turuncular"},
+  { id:"red",   primary:"#ff4d4d", secondary:"#ffe082", name:"Kırmızılar", short:"KRM", icon:"🛡️" },
+  { id:"blue",  primary:"#4d8cff", secondary:"#ffffff", name:"Maviler",    short:"MAV", icon:"🦅" },
+  { id:"yellow",primary:"#ffd84d", secondary:"#1a1a1a", name:"Sarılar",    short:"SAR", icon:"⭐" },
+  { id:"green", primary:"#36c264", secondary:"#0c2c14", name:"Yeşiller",   short:"YES", icon:"🍀" },
+  { id:"purple",primary:"#a974ff", secondary:"#ffffff", name:"Morlar",     short:"MOR", icon:"👑" },
+  { id:"orange",primary:"#ff8a3d", secondary:"#222222", name:"Turuncular", short:"TRN", icon:"🔥" },
 ];
 export function teamById(id){ return TEAMS.find(t=>t.id===id) || TEAMS[0]; }
 
