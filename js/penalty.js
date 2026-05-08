@@ -62,6 +62,7 @@ export class PenaltyScene {
       targetX: FIELD.W/2,
       targetY: FIELD.H*0.40,
       arcHeight: 120,
+      liftFactor: 0.5, // 0=yerden/çok alçak, 1=yüksek
     };
 
     // Aim için
@@ -168,9 +169,11 @@ export class PenaltyScene {
     const aimT = clamp01((aimY + 1) / 2);
     this.ball.targetY = lerp(this.goalRect.top + 16, this.goalRect.bottom - 10, aimT);
     this.ball.duration = 0.92 - power * 0.28;
-    // Üste vuruldukça yay yükselir, alta vuruldukça düz/yerden gider
+    // Üste vuruldukça yay yükselir; alta vuruldukça neredeyse düz gider.
     const highFactor = 1 - aimT; // üst=1, alt=0
-    this.ball.arcHeight = 20 + highFactor * 125 + power * 35;
+    this.ball.liftFactor = highFactor;
+    // Low shotta negatif/çok küçük değer verip \"hep havaya gitme\"yi kır.
+    this.ball.arcHeight = lerp(-16, 78, highFactor) * (0.65 + power * 0.35);
     Sfx.shoot(power);
     // AI kaleci varsa: yön tahminini AI'ya da sağla
     this._predictedDir = dir < -0.25 ? -1 : dir > 0.25 ? 1 : 0;
@@ -229,6 +232,12 @@ export class PenaltyScene {
       this.ball.x = baseX;
       this.ball.y = baseY - arc * this.ball.arcHeight;
       this.ball.z = pClamped;
+
+      // Çok alçak şutlarda son bölümde topu yere daha fazla bastır (driven shot hissi)
+      if (this.ball.liftFactor < 0.25 && pClamped > 0.62) {
+        const tail = (pClamped - 0.62) / 0.38; // 0..1
+        this.ball.y += tail * tail * 18;
+      }
 
       // Çizimde kullanılan perspektif top konumu (gol/savunma kararında bununla aynı koordinatı kullanacağız)
       const visualX = (FIELD.W/2) + (this.ball.x - FIELD.W/2) * (1 - this.ball.z*0.3);
