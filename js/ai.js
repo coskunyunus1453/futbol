@@ -116,10 +116,12 @@ export class PenaltyKeeperAI {
   reset() { this.commit = null; this.committedAt = 0; }
   // sceneTime: sahneden bu yana saniye, ballHasFired: top atıldı mı
   update(gk, ball, dt, sceneTime, ballHasFired, predictedDir) {
+    const baseY = gk.baseY ?? FIELD.H * 0.52;
     if (!ballHasFired) {
       // Hafifçe ortalanan yer değiştirme
       const targetX = FIELD.W/2 + Math.sin(sceneTime*1.2)*30;
       gk.x += (targetX - gk.x) * Math.min(1, dt*4);
+      gk.y += (baseY - gk.y) * Math.min(1, dt * 6);
       return;
     }
     // Atış sonrası — yöne göre atla
@@ -133,7 +135,7 @@ export class PenaltyKeeperAI {
     }
     // Yöne savrul
     const targetX = FIELD.W/2 + this.commit.dir * (FIELD.W*0.2);
-    const targetY = FIELD.H*0.42 + (this.commit.dir === 0 ? 0 : 30);
+    const targetY = baseY - (this.commit.dir === 0 ? 4 : 20);
     gk.x += (targetX - gk.x) * Math.min(1, dt * 6);
     gk.y += (targetY - gk.y) * Math.min(1, dt * 6);
     gk.diving = true;

@@ -395,41 +395,54 @@ export class Renderer {
     this.beginFrame();
     const ctx = this.ctx;
     // Zemin (çim) — alttan üste perspektif
-    const grad = ctx.createLinearGradient(0, FIELD.H*0.55, 0, FIELD.H);
+    const horizon = FIELD.H * 0.34;
+    const grad = ctx.createLinearGradient(0, horizon, 0, FIELD.H);
     grad.addColorStop(0, "#0d6c2c");
     grad.addColorStop(1, "#15a447");
     ctx.fillStyle = grad;
-    ctx.fillRect(0, FIELD.H*0.55, FIELD.W, FIELD.H*0.45);
+    ctx.fillRect(0, horizon, FIELD.W, FIELD.H - horizon);
     // Gökyüzü
-    const sky = ctx.createLinearGradient(0,0,0,FIELD.H*0.55);
+    const sky = ctx.createLinearGradient(0,0,0,horizon);
     sky.addColorStop(0,"#7ec8ff");
     sky.addColorStop(1,"#cfe9ff");
     ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, FIELD.W, FIELD.H*0.55);
-    // Tribün uzaktan
+    ctx.fillRect(0, 0, FIELD.W, horizon);
+    // Tribün uzaktan (kalecinin arkasında)
     ctx.fillStyle = "#444";
-    ctx.fillRect(0, FIELD.H*0.45, FIELD.W, 28);
+    ctx.fillRect(0, FIELD.H*0.28, FIELD.W, 48);
     // Tribün noktaları
     for (let x = 0; x < FIELD.W; x += 6) {
       const r = ((x*17)%5);
       const colors=["#ff4d4d","#ffd84d","#4d8cff","#36c264","#a974ff"];
       ctx.fillStyle = colors[r];
-      ctx.fillRect(x, FIELD.H*0.46 + (r%3)*4, 4, 4);
+      ctx.fillRect(x, FIELD.H*0.29 + (r%3)*6, 4, 4);
     }
     // Çim çizgileri (perspektif)
     ctx.strokeStyle = "rgba(255,255,255,0.6)";
     ctx.lineWidth = 2;
     // 6 yard çizgisi
     ctx.beginPath();
-    ctx.moveTo(FIELD.W*0.18, FIELD.H*0.66);
-    ctx.lineTo(FIELD.W*0.82, FIELD.H*0.66);
+    ctx.moveTo(FIELD.W*0.18, FIELD.H*0.62);
+    ctx.lineTo(FIELD.W*0.82, FIELD.H*0.62);
     ctx.stroke();
+    // Penaltı noktası
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.beginPath();
+    ctx.arc(FIELD.W * 0.5, FIELD.H * 0.82, 4, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   // Kale — uzaktan perspektifli
-  drawPenaltyGoal(netImpulse, ballSx, ballSy, t) {
+  drawPenaltyGoal(netImpulse, ballSx, ballSy, t, rect = null) {
     const ctx = this.ctx;
-    const cx = FIELD.W/2, top = FIELD.H*0.32, h = FIELD.H*0.30, w = FIELD.W*0.42;
+    const goal = rect || {
+      left: FIELD.W * 0.30, right: FIELD.W * 0.70,
+      top: FIELD.H * 0.24, bottom: FIELD.H * 0.56,
+    };
+    const cx = (goal.left + goal.right) / 2;
+    const top = goal.top;
+    const h = goal.bottom - goal.top;
+    const w = goal.right - goal.left;
     // Direkler
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(cx - w/2 - 6, top, 8, h);

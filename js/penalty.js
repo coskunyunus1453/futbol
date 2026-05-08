@@ -30,23 +30,38 @@ export class PenaltyScene {
 
     // Kaleci/şutör nesneleri
     this.shooter = {
-      x: FIELD.W/2, y: FIELD.H*0.85, team: this.home,
+      x: FIELD.W/2, y: FIELD.H*0.86, team: this.home,
       facingCamera: false, hairColor: "#3a2615", number: "9",
     };
+    this.goalRect = {
+      left: FIELD.W * 0.30,
+      right: FIELD.W * 0.70,
+      top: FIELD.H * 0.24,
+      bottom: FIELD.H * 0.56,
+      lineY: FIELD.H * 0.52, // kalecinin ayak bastığı kale çizgisi
+    };
     this.gk = {
-      x: FIELD.W/2, y: FIELD.H*0.42, team: this.away,
+      x: FIELD.W/2, y: this.goalRect.lineY, team: this.away,
       facingCamera: true, hairColor: "#a0522d", number: "1",
       diving: false, diveAngle: 0,
+      baseY: this.goalRect.lineY,
     };
 
     // Top ekran koordinatlarında (sadece bu mod için)
     this.ball = {
-      x: FIELD.W/2, y: FIELD.H*0.83,   // ekranda başlangıç (oyuncu önü)
-      z: 0,                            // perspektif derinlik (0=yakın, 1=uzak)
+      x: FIELD.W/2, y: FIELD.H*0.82,
+      z: 0,
       vx: 0, vy: 0, vz: 0,
-      r: 14,
+      r: 22,                           // daha büyük ve görünür top
       flying: false,
       netImpulse: 0,
+      t: 0,
+      duration: 0.8,
+      startX: FIELD.W/2,
+      startY: FIELD.H*0.82,
+      targetX: FIELD.W/2,
+      targetY: FIELD.H*0.40,
+      arcHeight: 120,
     };
 
     // Aim için
@@ -85,6 +100,7 @@ export class PenaltyScene {
     } else if (m.t === "kpos") {
       // Karşı tarafın kaleci pozisyon güncellemesi
       this.gk.x = m.x; this.gk.y = m.y;
+      this._clampKeeper();
       if (m.dir != null) { this.gk.diving = true; this.gk.diveAngle = m.dir * 0.8; }
     } else if (m.t === "result") {
       this.score = m.score; this.attempts = m.attempts; this.shotsLog = m.shotsLog;
@@ -114,8 +130,11 @@ export class PenaltyScene {
     this.ball.x = FIELD.W/2; this.ball.y = FIELD.H*0.83;
     this.ball.z = 0; this.ball.vx = 0; this.ball.vy = 0; this.ball.vz = 0;
     this.ball.flying = false; this.ball.netImpulse = 0;
+    this.ball.t = 0;
+    this.ball.duration = 0.82;
     this.shooter.x = FIELD.W/2; this.shooter.y = FIELD.H*0.85;
-    this.gk.x = FIELD.W/2; this.gk.y = FIELD.H*0.42;
+    this.gk.x = FIELD.W/2; this.gk.y = this.goalRect.lineY;
+    this.gk.baseY = this.goalRect.lineY;
     this.gk.diving = false; this.gk.diveAngle = 0;
     this.aim.x = 0; this.aim.y = 0; this.charge = 0;
     this.keeperAI.reset();
@@ -130,11 +149,16 @@ export class PenaltyScene {
     if (this.ball.flying) return;
     this.ball.flying = true;
     this.state = "shot";
-    // Hız: yatay yön, yukarı doğru gider (z artar)
-    const horizSpread = 220;
-    this.ball.vx = dir * horizSpread * (0.8 + power*0.6);
-    this.ball.vy = - (130 + 100 * power);
-    this.ball.vz = 1.2 + 0.6 * power;  // perspektif derinleşme hızı
+    this.ball.t = 0;
+    this.ball.startX = FIELD.W / 2;
+    this.ball.startY = FIELD.H * 0.82;
+    const noise = (Math.random() - 0.5) * (1 - power) * 40;
+    this.ball.targetX = FIELD.W / 2 + dir * (FIELD.W * 0.18) + noise;
+    // Güce göre daha üst köşe hedefi
+    const topBias = 0.30 - power * 0.09;
+    this.ball.targetY = this.goalRect.top + (this.goalRect.bottom - this.goalRect.top) * (topBias + Math.random() * 0.30);
+    this.ball.duration = 0.92 - power * 0.28;
+    this.ball.arcHeight = 85 + power * 120;
     Sfx.shoot(power);
     // AI kaleci varsa: yön tahminini AI'ya da sağla
     this._predictedDir = dir < -0.25 ? -1 : dir > 0.25 ? 1 : 0;
@@ -147,8 +171,6 @@ export class PenaltyScene {
     if (this.state === "paused" || this.state === "over") return;
 
     this.timer += dt;
-    const isAuthoritative = !this.opts.online || this.netRole === "host";
-
     if (this.state === "ready" || this.state === "aiming") {
       if (this._userIsShooter) {
         // Aim'i joystick ile ayarla
@@ -166,52 +188,57 @@ export class PenaltyScene {
         // Kaleci: joystick ile pozisyon kaydır
         if (this.opts.online) {
           // İnsan kaleci: oyuncudan gelen yönle hareket
-          const sx = FIELD.W/2 + input.dir.x * (FIELD.W*0.18);
-          const sy = FIELD.H*0.42 + Math.max(0, -input.dir.y) * 30;
+          const sx = FIELD.W/2 + input.dir.x * (FIELD.W*0.15);
+          const sy = this.goalRect.lineY - Math.max(0, -input.dir.y) * 28;
           this.gk.x += (sx - this.gk.x) * Math.min(1, dt*6);
           this.gk.y += (sy - this.gk.y) * Math.min(1, dt*6);
+          this._clampKeeper();
           this.network && this.network.send({ t:"kpos", x:this.gk.x|0, y:this.gk.y|0, dir:null });
         } else {
           // AI şutör — yumuşak hareket
           const cmd = this.shooterAI.update(this, dt, this.timer);
           if (cmd) this._takeShot(cmd.dir, cmd.power);
           // Kullanıcı kaleci olarak joystick ile yatay/dikey hareket eder
-          const sx = FIELD.W/2 + input.dir.x * (FIELD.W*0.18);
-          const sy = FIELD.H*0.42 + Math.max(0, -input.dir.y) * 30;
+          const sx = FIELD.W/2 + input.dir.x * (FIELD.W*0.15);
+          const sy = this.goalRect.lineY - Math.max(0, -input.dir.y) * 28;
           this.gk.x += (sx - this.gk.x) * Math.min(1, dt*6);
           this.gk.y += (sy - this.gk.y) * Math.min(1, dt*6);
+          this._clampKeeper();
         }
       }
     }
 
     if (this.state === "shot" || this.ball.flying) {
-      // Topu yukarı uçur; perspektif z artar
-      const dt2 = dt;
-      this.ball.x += this.ball.vx * dt2;
-      this.ball.y += this.ball.vy * dt2;
-      this.ball.z += this.ball.vz * dt2;
-      this.ball.vy += 380 * dt2; // hafif kütleçekim — düşmeye başlar
-      // Sürtünme
-      this.ball.vx *= 0.995;
+      // Gerçekçi şut eğrisi: hedefe doğru ilerlerken parabolik yükselip iner.
+      this.ball.t += dt / this.ball.duration;
+      const p = Math.min(1.05, this.ball.t);
+      const pClamped = Math.min(1, p);
+      const baseX = lerp(this.ball.startX, this.ball.targetX, pClamped);
+      const baseY = lerp(this.ball.startY, this.ball.targetY, pClamped);
+      const arc = 4 * pClamped * (1 - pClamped); // 0..1..0
+      this.ball.x = baseX;
+      this.ball.y = baseY - arc * this.ball.arcHeight;
+      this.ball.z = pClamped;
 
       // Kaleci AI (yapay zekaya karşı modda)
       if (!this.opts.online && this._userIsShooter) {
         // Kullanıcı atıcı, AI kaleci — atış sonrası tepki
         this.keeperAI.update(this.gk, this.ball, dt, this.timer, true, this._predictedDir);
+        this._clampKeeper();
       }
       if (!this.opts.online && !this._userIsShooter) {
         // Kullanıcı kaleci — joystick ile hareket zaten sağlandı
       }
 
       // Çarpışma kontrolü — kale çerçevesi
-      const goalLeft = FIELD.W*0.29, goalRight = FIELD.W*0.71;
-      const goalTop = FIELD.H*0.32, goalBot = FIELD.H*0.62;
+      const goalLeft = this.goalRect.left, goalRight = this.goalRect.right;
+      const goalTop = this.goalRect.top, goalBot = this.goalRect.bottom;
       // Kaleci kurtarması (basit dikdörtgen)
-      const gkBox = { x: this.gk.x, y: this.gk.y, w: 70, h: 90 };
+      const gkBox = { x: this.gk.x, y: this.gk.y - 12, w: 92, h: 112 };
       const pointInRect = (x,y, b) => x > b.x - b.w/2 && x < b.x + b.w/2 && y > b.y - b.h/2 && y < b.y + b.h/2;
 
       // Top kale derinliğine ulaştığında sonuç ver
-      if (this.ball.z >= 1.0 && !this._resolved) {
+      if (this.ball.t >= 1.0 && !this._resolved) {
         this._resolved = true;
         // Topun ekran konumu
         const bx = this.ball.x, by = this.ball.y;
@@ -233,6 +260,7 @@ export class PenaltyScene {
         } else if (result === "save") {
           this.shotsLog.push("save");
           Sfx.bounce(0.8);
+          this.renderer.emitParticles(bx, by, 10, "#d8ecff", 160, 0.45);
           this.ui.toast("KURTARDI!", 1.4);
         } else {
           this.shotsLog.push("miss");
@@ -292,33 +320,40 @@ export class PenaltyScene {
 
     // Kale (uzakta, perspektifli)
     // Topun ekran posizyonu (z'ye göre küçülür)
-    const ballScale = 1 - this.ball.z * 0.7; // 1 -> 0.3
+    const ballScale = 1 - this.ball.z * 0.45; // daha doğal küçülme
     const persX = (FIELD.W/2) + (this.ball.x - FIELD.W/2) * (1 - this.ball.z*0.3);
     const persY = this.ball.y - this.ball.z * (FIELD.H*0.30); // yukarı
-    r.drawPenaltyGoal(this.ball.netImpulse || 0, persX, persY, t);
+    r.drawPenaltyGoal(this.ball.netImpulse || 0, persX, persY, t, this.goalRect);
 
-    // Kaleci (uzakta, küçük scale)
-    r.drawPenaltyCharacter(this.gk, 0.85);
+    // Kaleci (kale çizgisinde, zeminde)
+    r.drawPenaltyCharacter(this.gk, 1.15);
 
     // Top
     r.ctx.fillStyle = "rgba(0,0,0,0.35)";
     r.ctx.beginPath();
-    r.ctx.ellipse(persX, FIELD.H*0.86 - this.ball.z*100, 14*Math.max(0.4,1-this.ball.z), 5, 0, 0, Math.PI*2);
+    r.ctx.ellipse(
+      persX,
+      FIELD.H * 0.86 - this.ball.z * 100,
+      20 * Math.max(0.45, 1 - this.ball.z),
+      7,
+      0, 0, Math.PI * 2
+    );
     r.ctx.fill();
     r.ctx.fillStyle = "#fff";
     r.ctx.beginPath();
-    r.ctx.arc(persX, persY, this.ball.r * Math.max(0.3, ballScale), 0, Math.PI*2);
+    const visualR = this.ball.r * Math.max(0.45, ballScale);
+    r.ctx.arc(persX, persY, visualR, 0, Math.PI*2);
     r.ctx.fill();
     r.ctx.fillStyle = "#1a1a1a";
     for (let i = 0; i < 5; i++) {
       const a = i*(Math.PI*2/5) + this.timer*5;
-      const px = persX + Math.cos(a)*5*Math.max(0.3,ballScale);
-      const py = persY + Math.sin(a)*5*Math.max(0.3,ballScale);
-      r.ctx.beginPath(); r.ctx.arc(px, py, 1.8*Math.max(0.3,ballScale), 0, Math.PI*2); r.ctx.fill();
+      const px = persX + Math.cos(a) * (visualR * 0.42);
+      const py = persY + Math.sin(a) * (visualR * 0.42);
+      r.ctx.beginPath(); r.ctx.arc(px, py, Math.max(1.6, visualR * 0.14), 0, Math.PI*2); r.ctx.fill();
     }
 
     // Şutör — kameraya yakın (büyük), arkadan görünür
-    r.drawPenaltyCharacter(this.shooter, 1.6);
+    r.drawPenaltyCharacter(this.shooter, 1.75);
 
     // Aim göstergesi (kullanıcı şutör ise)
     if (this._userIsShooter && (this.state === "ready" || this.state === "aiming")) {
@@ -326,7 +361,7 @@ export class PenaltyScene {
       r.ctx.lineWidth = 3;
       r.ctx.setLineDash([8, 8]);
       const ax = FIELD.W/2 + this.aim.x * (FIELD.W*0.22);
-      const ay = FIELD.H*0.42 + this.aim.y * 40;
+      const ay = this.goalRect.top + (this.goalRect.bottom - this.goalRect.top) * 0.45 + this.aim.y * 40;
       r.ctx.beginPath();
       r.ctx.moveTo(FIELD.W/2, FIELD.H*0.82);
       r.ctx.lineTo(ax, ay);
@@ -360,4 +395,13 @@ export class PenaltyScene {
 
     r.drawParticles();
   }
+
+  _clampKeeper() {
+    this.gk.x = Math.max(this.goalRect.left + 28, Math.min(this.goalRect.right - 28, this.gk.x));
+    this.gk.y = Math.max(this.goalRect.lineY - 30, Math.min(this.goalRect.lineY + 8, this.gk.y));
+  }
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
 }
