@@ -67,6 +67,12 @@ export class PenaltyScene {
     // Aim için
     this.aim = { x: 0, y: 0 }; // -1..1
     this.charge = 0;
+    this.dragAim = {
+      active: false,
+      pointerX: FIELD.W / 2,
+      pointerY: FIELD.H * 0.62,
+      previewPower: 0.7,
+    };
 
     this.keeperAI = new PenaltyKeeperAI(opts.difficulty ?? 0.7);
     this.shooterAI = new PenaltyShooterAI(opts.difficulty ?? 0.7);
@@ -96,7 +102,7 @@ export class PenaltyScene {
     if (!m) return;
     if (m.t === "shot") {
       // Karşı taraftan gelen şut komutu (uzak şutör)
-      this._takeShot(m.dir, m.power, /*remote*/true);
+      this._takeShot(m.dir, m.power, m.aimY ?? 0, /*remote*/true);
     } else if (m.t === "kpos") {
       // Karşı tarafın kaleci pozisyon güncellemesi
       this.gk.x = m.x; this.gk.y = m.y;
@@ -137,6 +143,10 @@ export class PenaltyScene {
     this.gk.baseY = this.goalRect.lineY;
     this.gk.diving = false; this.gk.diveAngle = 0;
     this.aim.x = 0; this.aim.y = 0; this.charge = 0;
+    this.dragAim.active = false;
+    this.dragAim.pointerX = FIELD.W / 2;
+    this.dragAim.pointerY = FIELD.H * 0.62;
+    this.dragAim.previewPower = 0.7;
     this.keeperAI.reset();
     this.shooterAI.reset();
     this.ui.toast(this._sideName(this.currentShooter) + " atıyor", 1.4);
@@ -144,8 +154,8 @@ export class PenaltyScene {
 
   _sideName(s){ return (s === "home" ? this.home.name : this.away.name); }
 
-  // Tek atışı başlat. dir: -1..1 (yatay), power: 0..1
-  _takeShot(dir, power, remote = false) {
+  // Tek atışı başlat. dir: -1..1 (yatay), aimY: -1..1 (üst/alt), power: 0..1
+  _takeShot(dir, power, aimY = 0, remote = false) {
     if (this.ball.flying) return;
     this.ball.flying = true;
     this.state = "shot";
@@ -153,12 +163,14 @@ export class PenaltyScene {
     this.ball.startX = FIELD.W / 2;
     this.ball.startY = FIELD.H * 0.82;
     const noise = (Math.random() - 0.5) * (1 - power) * 40;
-    this.ball.targetX = FIELD.W / 2 + dir * (FIELD.W * 0.18) + noise;
-    // Güce göre daha üst köşe hedefi
-    const topBias = 0.30 - power * 0.09;
-    this.ball.targetY = this.goalRect.top + (this.goalRect.bottom - this.goalRect.top) * (topBias + Math.random() * 0.30);
+    this.ball.targetX = FIELD.W / 2 + dir * (FIELD.W * 0.20) + noise;
+    // aimY=-1 üst, aimY=+1 alt; düşük şut mümkün
+    const aimT = clamp01((aimY + 1) / 2);
+    this.ball.targetY = lerp(this.goalRect.top + 16, this.goalRect.bottom - 10, aimT);
     this.ball.duration = 0.92 - power * 0.28;
-    this.ball.arcHeight = 85 + power * 120;
+    // Üste vuruldukça yay yükselir, alta vuruldukça düz/yerden gider
+    const highFactor = 1 - aimT; // üst=1, alt=0
+    this.ball.arcHeight = 20 + highFactor * 125 + power * 35;
     Sfx.shoot(power);
     // AI kaleci varsa: yön tahminini AI'ya da sağla
     this._predictedDir = dir < -0.25 ? -1 : dir > 0.25 ? 1 : 0;
@@ -173,15 +185,13 @@ export class PenaltyScene {
     this.timer += dt;
     if (this.state === "ready" || this.state === "aiming") {
       if (this._userIsShooter) {
-        // Aim'i joystick ile ayarla
-        this.aim.x += (input.dir.x - this.aim.x) * Math.min(1, dt*8);
-        this.aim.y += (input.dir.y - this.aim.y) * Math.min(1, dt*8);
+        // Şutör kontrolü artık sürükle-bırak ile yapılır.
         this.state = "aiming";
         if (input.just.shoot) {
           const power = Math.max(0.4, input.shootCharge || 0.6);
-          this._takeShot(this.aim.x, power);
+          this._takeShot(this.aim.x, power, this.aim.y);
           if (this.opts.online) {
-            this.network && this.network.send({ t:"shot", dir:this.aim.x, power });
+            this.network && this.network.send({ t:"shot", dir:this.aim.x, power, aimY:this.aim.y });
           }
         }
       } else {
@@ -197,7 +207,7 @@ export class PenaltyScene {
         } else {
           // AI şutör — yumuşak hareket
           const cmd = this.shooterAI.update(this, dt, this.timer);
-          if (cmd) this._takeShot(cmd.dir, cmd.power);
+          if (cmd) this._takeShot(cmd.dir, cmd.power, (Math.random() * 2 - 1) * 0.7);
           // Kullanıcı kaleci olarak joystick ile yatay/dikey hareket eder
           const sx = FIELD.W/2 + input.dir.x * (FIELD.W*0.15);
           const sy = this.goalRect.lineY - Math.max(0, -input.dir.y) * 28;
@@ -365,8 +375,8 @@ export class PenaltyScene {
       r.ctx.strokeStyle = "rgba(255,216,77,0.85)";
       r.ctx.lineWidth = 3;
       r.ctx.setLineDash([8, 8]);
-      const ax = FIELD.W/2 + this.aim.x * (FIELD.W*0.22);
-      const ay = this.goalRect.top + (this.goalRect.bottom - this.goalRect.top) * 0.45 + this.aim.y * 40;
+      const ax = FIELD.W/2 + this.aim.x * (FIELD.W*0.24);
+      const ay = this.goalRect.top + (this.goalRect.bottom - this.goalRect.top) * ((this.aim.y + 1) / 2);
       r.ctx.beginPath();
       r.ctx.moveTo(FIELD.W/2, FIELD.H*0.82);
       r.ctx.lineTo(ax, ay);
@@ -405,8 +415,55 @@ export class PenaltyScene {
     this.gk.x = Math.max(this.goalRect.left + 28, Math.min(this.goalRect.right - 28, this.gk.x));
     this.gk.y = Math.max(this.goalRect.lineY - 30, Math.min(this.goalRect.lineY + 8, this.gk.y));
   }
+
+  // Canvas pointer koordinatı (world) ile sürükle hedefleme.
+  // Şutör kullanıcıysa pointer bırakınca otomatik şut atar.
+  pointerAim(type, wx, wy) {
+    if (!this._userIsShooter) return;
+    if (!(this.state === "ready" || this.state === "aiming")) return;
+    if (this.ball.flying) return;
+
+    const ballX = FIELD.W / 2;
+    const ballY = FIELD.H * 0.82;
+    const goalCx = FIELD.W / 2;
+    const goalCy = (this.goalRect.top + this.goalRect.bottom) / 2;
+    const goalHalfW = (this.goalRect.right - this.goalRect.left) / 2;
+    const goalHalfH = (this.goalRect.bottom - this.goalRect.top) / 2;
+
+    if (type === "down") {
+      this.dragAim.active = true;
+    }
+    if (type === "move" || type === "down") {
+      if (!this.dragAim.active) return;
+      this.dragAim.pointerX = wx;
+      this.dragAim.pointerY = wy;
+      // Hedef normalize: -1..1 (kale merkezi referanslı)
+      this.aim.x = Math.max(-1.35, Math.min(1.35, (wx - goalCx) / goalHalfW));
+      this.aim.y = Math.max(-1.35, Math.min(1.35, (wy - goalCy) / goalHalfH));
+      // Güç: top başlangıcından sürükleme mesafesi
+      const dragDist = Math.hypot(wx - ballX, wy - ballY);
+      this.dragAim.previewPower = Math.max(0.42, Math.min(1, dragDist / 300));
+      this.state = "aiming";
+    }
+    if (type === "up") {
+      if (!this.dragAim.active) return;
+      this.dragAim.active = false;
+      // Parmağı/fareyi çok kısa hareket ettirirse isabetsiz min şut olmasın diye eşik
+      const dragDist = Math.hypot(this.dragAim.pointerX - ballX, this.dragAim.pointerY - ballY);
+      if (dragDist < 20) return;
+      const power = this.dragAim.previewPower;
+      this._takeShot(this.aim.x, power, this.aim.y);
+      if (this.opts.online) {
+        this.network && this.network.send({ t: "shot", dir: this.aim.x, power, aimY: this.aim.y });
+      }
+    }
+  }
 }
 
 function lerp(a, b, t) {
   return a + (b - a) * t;
+}
+
+function clamp01(v) {
+  return Math.max(0, Math.min(1, v));
 }

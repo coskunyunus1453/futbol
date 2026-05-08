@@ -178,6 +178,7 @@ function startScene(kind, opts) {
   } else {
     state.scene = new PenaltyScene(canvas, sceneOpts, makeUI());
   }
+  setupPenaltyPointerControls(canvas);
 
   // HUD
   $("#home-name").textContent = teamById(state.homeTeam).name.slice(0,3).toUpperCase();
@@ -191,6 +192,26 @@ function startScene(kind, opts) {
   state.lastT = performance.now();
   cancelAnimationFrame(state.rafId);
   state.rafId = requestAnimationFrame(loop);
+}
+
+let penaltyPointerBound = false;
+function setupPenaltyPointerControls(canvas) {
+  if (penaltyPointerBound) return;
+  penaltyPointerBound = true;
+  const onPointer = (type, e) => {
+    const sc = state.scene;
+    if (!sc || !(sc instanceof PenaltyScene)) return;
+    if (!sc.renderer || !sc.pointerAim) return;
+    const p = sc.renderer.screenToWorld(e.clientX, e.clientY);
+    sc.pointerAim(type, p.x, p.y);
+  };
+  canvas.addEventListener("pointerdown", (e) => {
+    onPointer("down", e);
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener("pointermove", (e) => onPointer("move", e));
+  canvas.addEventListener("pointerup", (e) => onPointer("up", e));
+  canvas.addEventListener("pointercancel", (e) => onPointer("up", e));
 }
 
 function makeUI() {

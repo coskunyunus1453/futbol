@@ -40,6 +40,16 @@ export class Renderer {
     this.offY = (h - FIELD.H * s) / 2;
   }
 
+  screenToWorld(clientX, clientY) {
+    const r = this.canvas.getBoundingClientRect();
+    const px = (clientX - r.left) * this.dpr;
+    const py = (clientY - r.top) * this.dpr;
+    return {
+      x: (px - this.offX) / this.scale,
+      y: (py - this.offY) / this.scale,
+    };
+  }
+
   emitParticles(x, y, count, color, speed = 200, life = 0.5) {
     for (let i = 0; i < count; i++) {
       const a = Math.random() * Math.PI * 2;
