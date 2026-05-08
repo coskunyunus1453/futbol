@@ -220,6 +220,10 @@ export class PenaltyScene {
       this.ball.y = baseY - arc * this.ball.arcHeight;
       this.ball.z = pClamped;
 
+      // Çizimde kullanılan perspektif top konumu (gol/savunma kararında bununla aynı koordinatı kullanacağız)
+      const visualX = (FIELD.W/2) + (this.ball.x - FIELD.W/2) * (1 - this.ball.z*0.3);
+      const visualY = this.ball.y - this.ball.z * (FIELD.H*0.30);
+
       // Kaleci AI (yapay zekaya karşı modda)
       if (!this.opts.online && this._userIsShooter) {
         // Kullanıcı atıcı, AI kaleci — atış sonrası tepki
@@ -241,7 +245,8 @@ export class PenaltyScene {
       if (this.ball.t >= 1.0 && !this._resolved) {
         this._resolved = true;
         // Topun ekran konumu
-        const bx = this.ball.x, by = this.ball.y;
+        // Karar, oyuncunun ekranda gördüğü top koordinatıyla birebir aynı yapılır.
+        const bx = visualX, by = visualY;
         let result = "miss";
         if (pointInRect(bx, by, gkBox)) result = "save";
         else if (bx > goalLeft && bx < goalRight && by > goalTop && by < goalBot) result = "goal";
