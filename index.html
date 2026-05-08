@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<meta name="theme-color" content="#0b6e2a" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="screen-orientation" content="landscape" />
+<meta name="x5-orientation" content="landscape" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" type="image/svg+xml" href="icon.svg" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<link rel="stylesheet" href="css/style.css" />
+<title>Sevimli Futbol — Mobil Mini Oyun</title>
+</head>
+<body>
+  <!-- LANDSCAPE UYARI -->
+  <div id="rotate-warning">
+    <div class="rotate-icon">📱↻</div>
+    <h2>Lütfen telefonu yatay tut</h2>
+    <p>Bu oyun yatay ekranda oynanır.</p>
+  </div>
+
+  <!-- ANA MENÜ -->
+  <div id="menu" class="screen active">
+    <div class="menu-bg"></div>
+    <div class="menu-card">
+      <h1 class="logo">⚽ Sevimli Futbol</h1>
+      <p class="tag">Tatlı karakterler · Gerçekçi top fiziği · Online & Yapay Zeka</p>
+
+      <div class="mode-grid">
+        <button class="mode-btn" data-mode="match-ai">
+          <span class="mode-icon">🤖</span>
+          <span class="mode-title">Maç · YZ'ye Karşı</span>
+          <span class="mode-sub">Hızlı 90 sn karşılaşma</span>
+        </button>
+        <button class="mode-btn" data-mode="match-online">
+          <span class="mode-icon">🌐</span>
+          <span class="mode-title">Online 1v1 Maç</span>
+          <span class="mode-sub">Oda kodu ile arkadaşına karşı</span>
+        </button>
+        <button class="mode-btn" data-mode="penalty-ai">
+          <span class="mode-icon">🥅</span>
+          <span class="mode-title">Penaltı · YZ'ye Karşı</span>
+          <span class="mode-sub">5 atış, kaleci/şutör</span>
+        </button>
+        <button class="mode-btn" data-mode="penalty-online">
+          <span class="mode-icon">🎯</span>
+          <span class="mode-title">Penaltı Online</span>
+          <span class="mode-sub">Oda kodu — Kaleci & Şutör</span>
+        </button>
+      </div>
+
+      <div class="team-row">
+        <label>Takımın</label>
+        <div class="team-picks" id="team-picks"></div>
+      </div>
+
+      <p class="hint">İpucu: Sol joystick ile koş, sağ butonlarla <b>PAS</b>, <b>ORTA</b>, <b>ŞUT</b> yap.</p>
+    </div>
+  </div>
+
+  <!-- ONLINE EŞLEŞME EKRANI -->
+  <div id="online-screen" class="screen">
+    <div class="menu-card small">
+      <h2 id="online-title">Online Maç</h2>
+      <div class="online-tabs">
+        <button class="tab active" data-tab="host">Oda Aç</button>
+        <button class="tab" data-tab="join">Kodla Katıl</button>
+      </div>
+      <div class="tab-pane active" data-pane="host">
+        <p>Sana benzersiz bir oda kodu üretelim. Arkadaşına gönder.</p>
+        <button id="host-create" class="primary">Oda Oluştur</button>
+        <div id="host-code-box" class="hidden">
+          <div class="code-display"><span id="host-code">------</span></div>
+          <p class="muted" id="host-status">Rakip bekleniyor…</p>
+        </div>
+      </div>
+      <div class="tab-pane" data-pane="join">
+        <p>Arkadaşının verdiği oda kodunu gir.</p>
+        <input id="join-code" maxlength="10" placeholder="ODA KODU" autocapitalize="characters" />
+        <button id="join-btn" class="primary">Katıl</button>
+        <p class="muted" id="join-status"></p>
+      </div>
+      <button class="back-btn" data-target="menu">← Geri</button>
+    </div>
+  </div>
+
+  <!-- OYUN EKRANI -->
+  <div id="game-screen" class="screen">
+    <canvas id="game" width="1280" height="720"></canvas>
+
+    <!-- HUD üst -->
+    <div id="hud-top">
+      <div class="score-box home"><span id="home-name">EV</span> <b id="home-score">0</b></div>
+      <div class="time-box"><span id="match-clock">90</span></div>
+      <div class="score-box away"><b id="away-score">0</b> <span id="away-name">DEP</span></div>
+      <button id="pause-btn" class="hud-btn">⏸</button>
+      <button id="exit-btn" class="hud-btn">⏹</button>
+    </div>
+
+    <!-- Joystick -->
+    <div id="joystick" class="touch-zone left">
+      <div class="stick-base"><div class="stick-knob" id="stick-knob"></div></div>
+    </div>
+
+    <!-- Aksiyon butonları -->
+    <div id="actions" class="touch-zone right">
+      <button class="act pass" id="btn-pass">PAS</button>
+      <button class="act cross" id="btn-cross">ORTA</button>
+      <button class="act shoot" id="btn-shoot">ŞUT</button>
+    </div>
+
+    <!-- Pause overlay -->
+    <div id="pause-overlay" class="overlay hidden">
+      <div class="dialog">
+        <h2>⏸ Duraklatıldı</h2>
+        <button class="primary" id="resume-btn">Devam Et</button>
+        <button id="end-btn">Maçı Bitir</button>
+      </div>
+    </div>
+
+    <!-- Goal celebration overlay -->
+    <div id="goal-overlay" class="overlay hidden">
+      <div class="goal-text">GOOOOL!</div>
+    </div>
+
+    <!-- Kick-off / Penalty toast -->
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <!-- SONUÇ EKRANI -->
+  <div id="result-screen" class="screen">
+    <div class="menu-card small">
+      <h2 id="result-title">Maç Sonu</h2>
+      <div class="big-score">
+        <span id="result-home-name">EV</span>
+        <b id="result-home">0</b>
+        <span class="dash">—</span>
+        <b id="result-away">0</b>
+        <span id="result-away-name">DEP</span>
+      </div>
+      <p id="result-msg" class="muted">Tebrikler!</p>
+      <button class="primary" id="rematch-btn">Tekrar Oyna</button>
+      <button class="back-btn" data-target="menu">Ana Menü</button>
+    </div>
+  </div>
+
+  <!-- PeerJS for online multiplayer (optional - graceful fallback) -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" crossorigin="anonymous"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
